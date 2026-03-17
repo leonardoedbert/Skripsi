@@ -1,4 +1,3 @@
-# Skripsi
 # Evaluasi Metode Spiral Dynamic Optimization pada Hyperparameter Tuning Model XGBoost untuk Prediksi Tinggi Gelombang Laut
 
 ## Deskripsi Proyek
