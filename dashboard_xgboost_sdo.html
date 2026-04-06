@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Dashboard — XGBoost-SDO</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0c0e13;
+  --surface: #13161e;
+  --surface2: #1a1e28;
+  --border: rgba(255,255,255,0.07);
+  --border-accent: rgba(255,255,255,0.14);
+  --text: #e8eaf0;
+  --text-muted: #6b7080;
+  --text-dim: #3d4252;
+  --accent: #5b8af0;
+  --accent2: #3ddba8;
+  --accent3: #f06b6b;
+  --accent4: #f0b85b;
+  --accent-glow: rgba(91,138,240,0.15);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* NOISE OVERLAY */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.4;
+}
+
+/* LAYOUT */
+.shell { max-width: 1200px; margin: 0 auto; padding: 0 2rem 4rem; position: relative; z-index: 1; }
+
+/* HEADER */
+.header {
+  padding: 3.5rem 0 2.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2.5rem;
+}
+.header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+.header-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.header-title span { color: var(--accent); }
+.header-sub {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+  max-width: 500px;
+  line-height: 1.6;
+}
+.header-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.25rem; }
+.badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid;
+  letter-spacing: 0.04em;
+}
+.badge-blue { border-color: rgba(91,138,240,0.4); color: #8ab0f5; background: rgba(91,138,240,0.1); }
+.badge-green { border-color: rgba(61,219,168,0.4); color: #6de8c0; background: rgba(61,219,168,0.1); }
+.badge-amber { border-color: rgba(240,184,91,0.4); color: #f5cc7a; background: rgba(240,184,91,0.1); }
+.badge-red { border-color: rgba(240,107,107,0.4); color: #f59090; background: rgba(240,107,107,0.1); }
+
+/* NAV TABS */
+.nav-tabs {
+  display: flex; gap: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  width: fit-content;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+.nav-tab {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-muted);
+  background: transparent;
+  letter-spacing: 0.03em;
+}
+.nav-tab:hover { color: var(--text); background: var(--surface2); }
+.nav-tab.active { color: #fff; background: var(--accent); }
+
+/* SECTION */
+.section { display: none; animation: fadeIn 0.3s ease; }
+.section.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* METRIC CARDS */
+.metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.metric-card:hover { border-color: var(--border-accent); }
+.metric-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-accent, var(--accent));
+}
+.metric-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.metric-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4; }
+.metric-sub { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--text-dim); margin-top: 0.4rem; }
+
+/* CHART CARDS */
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+.chart-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+.chart-desc { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5; }
+.chart-wrap { position: relative; width: 100%; }
+
+/* PIPELINE */
+.pipeline {
+  display: flex; gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+.pipe-step {
+  flex: 1;
+  padding: 1.25rem 1rem;
+  border-right: 1px solid var(--border);
+  text-align: center;
+  position: relative;
+  transition: background 0.2s;
+  cursor: default;
+}
+.pipe-step:last-child { border-right: none; }
+.pipe-step:hover { background: var(--surface2); }
+.pipe-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+.pipe-label { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.4; }
+.pipe-arrow {
+  position: absolute; right: -1px; top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid var(--surface);
+  z-index: 2;
+  display: none;
+}
+
+/* TABLE */
+.table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 2rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+thead th {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0.85rem 1.1rem;
+  text-align: left;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-accent);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 0.8rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(255,255,255,0.02); }
+tbody tr.highlight td { background: rgba(91,138,240,0.08); }
+.status-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.status-best { background: rgba(61,219,168,0.15); color: #6de8c0; border: 1px solid rgba(61,219,168,0.3); }
+.status-pareto { background: rgba(91,138,240,0.15); color: #8ab0f5; border: 1px solid rgba(91,138,240,0.3); }
+.status-dominated { background: rgba(240,107,107,0.12); color: #f59090; border: 1px solid rgba(240,107,107,0.25); }
+
+/* STAT TESTS */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--border-accent); }
+.stat-icon { font-size: 1.4rem; margin-bottom: 0.75rem; }
+.stat-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 0.35rem;
+}
+.stat-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+.stat-result {
+  margin-top: 0.75rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* FINDINGS */
+.findings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.finding-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.finding-card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+  background: linear-gradient(to top, var(--card-glow, rgba(91,138,240,0.06)), transparent);
+  pointer-events: none;
+}
+.finding-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-bottom: 0.6rem;
+}
+.finding-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.6rem;
+  line-height: 1.3;
+}
+.finding-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; }
+
+/* SDO ANIMATION */
+.sdo-viz {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+.sdo-controls { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+.sdo-controls button {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  padding: 7px 18px;
+  border-radius: 6px;
+  border: 1px solid var(--border-accent);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sdo-controls button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sdo-controls label { font-size: 0.75rem; color: var(--text-muted); }
+.sdo-controls input[type=range] { accent-color: var(--accent); }
+
+/* SLIDER CONTROLS */
+.controls-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; align-items: center; }
+.control-group { display: flex; align-items: center; gap: 0.75rem; }
+.control-group label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.control-group select, .control-group input {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  background: var(--surface);
+  border: 1px solid var(--border-accent);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.control-group select:focus, .control-group input:focus { outline: none; border-color: var(--accent); }
+
+/* FOOTER */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 2rem 0 0;
+  margin-top: 3rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.footer-left { font-size: 0.75rem; color: var(--text-dim); }
+.footer-right {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-accent); border-radius: 3px; }
+
+@media (max-width: 600px) {
+  .pipeline { flex-direction: column; }
+  .pipe-step { border-right: none; border-bottom: 1px solid var(--border); }
+  .pipe-step:last-child { border-bottom: none; }
+  .chart-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <div class="header-title">XGBoost <span>+ SDO</span><br>Wave Height Prediction</div>
+        <p class="header-sub">Optimasi hyperparameter XGBoost menggunakan Spiral Dynamic Optimization untuk prediksi tinggi gelombang laut — BAB IV Hasil &amp; Pembahasan</p>
+        <div class="header-badges">
+          <span class="badge badge-blue">Machine Learning</span>
+          <span class="badge badge-green">Metaheuristic Optimization</span>
+          <span class="badge badge-amber">Time Series</span>
+          <span class="badge badge-red">Nonparametric Statistics</span>
+          <span class="badge badge-blue">Pareto Analysis</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAV -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showTab('overview')">Overview</button>
+    <button class="nav-tab" onclick="showTab('model')">Perbandingan Model</button>
+    <button class="nav-tab" onclick="showTab('hyperparams')">Dimensi Hyperparameter</button>
+    <button class="nav-tab" onclick="showTab('stats')">Uji Statistik</button>
+    <button class="nav-tab" onclick="showTab('sdo')">Simulasi SDO</button>
+    <button class="nav-tab" onclick="showTab('kesimpulan')">Kesimpulan</button>
+  </div>
+
+  <!-- ===================== TAB 1: OVERVIEW ===================== -->
+  <div class="section active" id="tab-overview">
+
+    <div class="metric-row">
+      <div class="metric-card" style="--card-accent: var(--accent)">
+        <div class="metric-num">9</div>
+        <div class="metric-label">Hyperparameter XGBoost dioptimasi</div>
+        <div class="metric-sub">dimensi ruang pencarian SDO</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent2)">
+        <div class="metric-num">32</div>
+        <div class="metric-label">Partikel SDO diinisialisasi</div>
+        <div class="metric-sub">sobol sequence quasi-random</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent4)">
+        <div class="metric-num">36</div>
+        <div class="metric-label">Kombinasi matriks rotasi</div>
+        <div class="metric-sub">bidang rotasi pada 9D</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent3)">
+        <div class="metric-num">7</div>
+        <div class="metric-label">Konfigurasi model dibandingkan</div>
+        <div class="metric-sub">termasuk baseline &amp; PSO</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent)">
+        <div class="metric-num">10</div>
+        <div class="metric-label">Seed perulangan evaluasi</div>
+        <div class="metric-sub">untuk uji robustness</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent2)">
+        <div class="metric-num">5</div>
+        <div class="metric-label">Model pada Pareto Front</div>
+        <div class="metric-sub">2 model dominated</div>
+      </div>
+    </div>
+
+    <div style="font-family:'Syne',sans-serif; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:1rem;">Pipeline Metodologi</div>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-num">01</div>
+        <div class="pipe-label">Prapemrosesan data latih &amp; uji</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">02</div>
+        <div class="pipe-label">Inisialisasi partikel SDO (sobol)</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">03</div>
+        <div class="pipe-label">Evaluasi fungsi objektif MSE</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">04</div>
+        <div class="pipe-label">Matriks rotasi 36 kombinasi 9D</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">05</div>
+        <div class="pipe-label">Update spiral posisi partikel</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">06</div>
+        <div class="pipe-label">Pareto Front &amp; komparasi model</div>
+      </div>
+    </div>
+
+    <div class="findings-grid">
+      <div class="finding-card" style="--card-glow: rgba(61,219,168,0.08)">
+        <div class="finding-num">FINDING 01</div>
+        <div class="finding-title">XGBoost-SDO unggul dari semua baseline</div>
+        <div class="finding-desc">Konfigurasi 7-hyperparameter dengan SDO menghasilkan RMSE terendah dan R² tertinggi, melampaui XGBoost-PSO, Grid Search, dan baseline.</div>
+      </div>
+      <div class="finding-card" style="--card-glow: rgba(91,138,240,0.08)">
+        <div class="finding-num">FINDING 02</div>
+        <div class="finding-title">Parameter r &amp; θ tidak berkorelasi signifikan</div>
+        <div class="finding-desc">Spearman dan Kendall's τ menunjukkan tidak ada hubungan monotonik antara parameter SDO (r, θ) terhadap RMSE, R², dan waktu evaluasi.</div>
+      </div>
+      <div class="finding-card" style="--card-glow: rgba(240,184,91,0.08)">
+        <div class="finding-num">FINDING 03</div>
+        <div class="finding-title">Dimensi 6–7 optimal: trade-off terbaik</div>
+        <div class="finding-desc">Peningkatan dimensi dari 2→8 meningkatkan performa, namun dimensi 9 mengalami degradasi dengan lonjakan waktu komputasi drastis.</div>
+      </div>
+      <div class="finding-card" style="--card-glow: rgba(240,107,107,0.08)">
+        <div class="finding-num">FINDING 04</div>
+        <div class="finding-title">Uji Friedman: perbedaan kinerja signifikan</div>
+        <div class="finding-desc">Meskipun korelasi monotonik tidak signifikan, uji Friedman membuktikan bahwa variasi dimensi memberikan pengaruh signifikan terhadap performa model.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 2: PERBANDINGAN MODEL ===================== -->
+  <div class="section" id="tab-model">
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Metrik:</label>
+        <select id="metricSelect" onchange="updateModelCharts()">
+          <option value="rmse">RMSE</option>
+          <option value="r2">R² Score</option>
+          <option value="time">Waktu Evaluasi (s)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Tampilkan:</label>
+        <select id="showSelect" onchange="updateModelCharts()">
+          <option value="all">Semua Model</option>
+          <option value="pareto">Pareto Only</option>
+          <option value="sdo">SDO Only</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card" style="grid-column: 1/-1;">
+        <div class="chart-title">Perbandingan Konfigurasi Model XGBoost</div>
+        <div class="chart-desc">Rata-rata dari 10 seed perulangan. Biru = Pareto optimal, Merah = dominated, Hijau = terbaik keseluruhan.</div>
+        <div class="chart-wrap" style="height: 300px;"><canvas id="modelBarChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Pareto Front — RMSE vs Waktu</div>
+        <div class="chart-desc">Trade-off multi-objektif: model terbaik berada di kiri-bawah. Bintang = posisi optimal.</div>
+        <div class="chart-wrap" style="height: 280px;"><canvas id="paretoScatter"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">R² Score per Model</div>
+        <div class="chart-desc">Semakin mendekati 1.0 = model semakin baik menjelaskan variansi data.</div>
+        <div class="chart-wrap" style="height: 280px;"><canvas id="r2Chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="modelTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Model</th>
+            <th>Config SDO</th>
+            <th>Mean RMSE ↓</th>
+            <th>Mean R² ↑</th>
+            <th>Waktu (s) ↓</th>
+            <th>Pareto</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="modelTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 3: DIMENSI HYPERPARAMETER ===================== -->
+  <div class="section" id="tab-hyperparams">
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Konfigurasi SDO:</label>
+        <select id="configSelect" onchange="updateDimCharts()">
+          <option value="all">Semua Konfigurasi</option>
+          <option value="c1">Konfigurasi 1</option>
+          <option value="c2">Konfigurasi 2</option>
+          <option value="c3">Konfigurasi 3</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Metrik:</label>
+        <select id="dimMetricSelect" onchange="updateDimCharts()">
+          <option value="rmse">RMSE</option>
+          <option value="r2">R²</option>
+          <option value="time">Waktu (s)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card" style="grid-column: 1/-1;">
+        <div class="chart-title">Tren Metrik vs Dimensi Hyperparameter</div>
+        <div class="chart-desc">Setiap titik = median dari 5 perulangan. Perhatikan sweet-spot pada dimensi 6–7.</div>
+        <div class="chart-wrap" style="height: 300px;"><canvas id="dimLineChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Boxplot RMSE per Dimensi (simulasi)</div>
+        <div class="chart-desc">Distribusi RMSE menunjukkan penurunan median dari dim 2 → 7, lalu degradasi di dim 9.</div>
+        <div class="chart-wrap" style="height: 280px;"><canvas id="boxplotChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Waktu Evaluasi vs Dimensi</div>
+        <div class="chart-desc">Kenaikan waktu signifikan mulai dimensi 6, mencapai ~1000 detik pada konfigurasi tertentu.</div>
+        <div class="chart-wrap" style="height: 280px;"><canvas id="timeAreaChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="metric-row" style="margin-top: 1.5rem;">
+      <div class="metric-card" style="--card-accent: var(--accent2)">
+        <div class="metric-num">7</div>
+        <div class="metric-label">Dimensi hyperparameter terbaik</div>
+        <div class="metric-sub">RMSE terendah, R² tertinggi</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent4)">
+        <div class="metric-num">6–8</div>
+        <div class="metric-label">Rentang dimensi optimal</div>
+        <div class="metric-sub">trade-off akurasi vs waktu</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent3)">
+        <div class="metric-num">9</div>
+        <div class="metric-label">Dimensi dengan degradasi</div>
+        <div class="metric-sub">performa menurun, waktu naik</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent)">
+        <div class="metric-num">~800s</div>
+        <div class="metric-label">Estimasi waktu dim 8</div>
+        <div class="metric-sub">vs ~50s pada dim 2–3</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 4: UJI STATISTIK ===================== -->
+  <div class="section" id="tab-stats">
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🧮</div>
+        <div class="stat-name">Shapiro-Wilk</div>
+        <div class="stat-desc">Uji normalitas distribusi data RMSE, R², dan waktu evaluasi pada seluruh dimensi dan konfigurasi.</div>
+        <div class="stat-result" style="background:rgba(240,107,107,0.12);color:#f59090;border:1px solid rgba(240,107,107,0.25);">H₀ ditolak — data tidak normal (α=0.05)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-name">Levene's Test</div>
+        <div class="stat-desc">Uji homogenitas varians antar dimensi hyperparameter pada semua konfigurasi SDO.</div>
+        <div class="stat-result" style="background:rgba(240,107,107,0.12);color:#f59090;border:1px solid rgba(240,107,107,0.25);">H₀ ditolak — varians tidak homogen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚖️</div>
+        <div class="stat-name">Friedman Test</div>
+        <div class="stat-desc">Uji komparasi nonparametrik — apakah perbedaan antar dimensi hyperparameter signifikan secara statistik.</div>
+        <div class="stat-result" style="background:rgba(61,219,168,0.12);color:#6de8c0;border:1px solid rgba(61,219,168,0.25);">Perbedaan signifikan antar dimensi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📈</div>
+        <div class="stat-name">Korelasi Spearman</div>
+        <div class="stat-desc">Uji hubungan monotonik parameter r &amp; θ SDO terhadap RMSE, R², dan waktu evaluasi.</div>
+        <div class="stat-result" style="background:rgba(240,184,91,0.12);color:#f5cc7a;border:1px solid rgba(240,184,91,0.25);">Tidak ada hubungan signifikan</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📉</div>
+        <div class="stat-name">Kendall's Tau</div>
+        <div class="stat-desc">Konfirmasi uji korelasi Spearman menggunakan metode rank-based alternatif yang lebih robust.</div>
+        <div class="stat-result" style="background:rgba(240,184,91,0.12);color:#f5cc7a;border:1px solid rgba(240,184,91,0.25);">Konsisten dengan Spearman</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-name">Pareto Front</div>
+        <div class="stat-desc">Analisis multi-objektif untuk menentukan konfigurasi optimal berdasarkan trade-off RMSE dan waktu.</div>
+        <div class="stat-result" style="background:rgba(91,138,240,0.12);color:#8ab0f5;border:1px solid rgba(91,138,240,0.25);">5 model Pareto, 2 dominated</div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Korelasi Spearman — Parameter vs Metrik</div>
+        <div class="chart-desc">Nilai koefisien korelasi parameter r dan θ terhadap tiga metrik evaluasi. Garis putus = batas signifikansi.</div>
+        <div class="chart-wrap" style="height: 260px;"><canvas id="corrChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Alur Pemilihan Uji Statistik</div>
+        <div class="chart-desc">Normalitas gagal → varians tidak homogen → pilih pendekatan nonparametrik (Friedman).</div>
+        <div class="chart-wrap" style="height: 260px;" id="flowDiagram"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 5: SIMULASI SDO ===================== -->
+  <div class="section" id="tab-sdo">
+
+    <div class="chart-card" style="margin-bottom:1.5rem;">
+      <div class="chart-title">Animasi Spiral Dynamic Optimization (SDO)</div>
+      <div class="chart-desc">Visualisasi pergerakan partikel SDO mencari hyperparameter optimal. Partikel bergerak secara spiral menuju pusat solusi terbaik.</div>
+
+      <div class="sdo-controls" style="justify-content:flex-start; margin-bottom: 1rem;">
+        <button onclick="startSDO()">▶ Mulai</button>
+        <button onclick="pauseSDO()">⏸ Pause</button>
+        <button onclick="resetSDO()">↺ Reset</button>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">Partikel:</label>
+          <input type="range" min="5" max="30" value="15" id="particleCount" style="width:100px;" oninput="document.getElementById('pCount').textContent=this.value">
+          <span id="pCount" style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text-muted);">15</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">Kecepatan:</label>
+          <input type="range" min="1" max="10" value="4" id="sdoSpeed" style="width:100px;">
+        </div>
+      </div>
+
+      <canvas id="sdoCanvas" style="width:100%;border-radius:8px;background:#0c0e13;border:1px solid var(--border);display:block;" height="380"></canvas>
+
+      <div style="display:flex;gap:2rem;margin-top:1rem;flex-wrap:wrap;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-muted);">ITERASI</div>
+          <div id="iterNum" style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent);">0</div>
+        </div>
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-muted);">MSE TERBAIK</div>
+          <div id="bestMSE" style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent2);">—</div>
+        </div>
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-muted);">STATUS</div>
+          <div id="sdoStatus" style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent4);">Idle</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Konvergensi MSE per Iterasi</div>
+        <div class="chart-desc">Nilai fungsi objektif terbaik (MSE) pada setiap iterasi SDO. Kurva menurun menunjukkan konvergensi.</div>
+        <div class="chart-wrap" style="height: 240px;"><canvas id="convergenceChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Rasio Kontraksi &amp; Pusat Spiral</div>
+        <div class="chart-desc">Parameter r (rasio kontraksi) mengontrol kecepatan spiral. θ (sudut rotasi) mengontrol arah pencarian.</div>
+        <div class="chart-wrap" style="height: 240px;" id="sdoFormula"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB 6: KESIMPULAN ===================== -->
+  <div class="section" id="tab-kesimpulan">
+
+    <div class="metric-row">
+      <div class="metric-card" style="--card-accent: var(--accent2)">
+        <div class="metric-num" style="color:var(--accent2);">✓</div>
+        <div class="metric-label">SDO lebih baik dari PSO &amp; Grid Search</div>
+        <div class="metric-sub">RMSE terendah, R² tertinggi</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent4)">
+        <div class="metric-num" style="color:var(--accent4);">H₀</div>
+        <div class="metric-label">r &amp; θ tidak berkorelasi signifikan</div>
+        <div class="metric-sub">Spearman &amp; Kendall's τ</div>
+      </div>
+      <div class="metric-card" style="--card-accent: var(--accent3)">
+        <div class="metric-num" style="color:var(--accent3);">H₁</div>
+        <div class="metric-label">Dimensi berpengaruh signifikan</div>
+        <div class="metric-sub">via uji Friedman nonparametrik</div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom: 1.5rem;">
+      <div class="chart-title">Ringkasan 3 Kesimpulan Utama</div>
+      <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem;">
+
+        <div style="display:flex;gap:1.25rem;align-items:flex-start;">
+          <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:rgba(61,219,168,0.15);border:1px solid rgba(61,219,168,0.3);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:#6de8c0;font-size:0.9rem;">1</div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-weight:600;font-size:0.9rem;color:#fff;margin-bottom:0.35rem;">Integrasi SDO meningkatkan performa XGBoost</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6;">Berdasarkan analisis Pareto Front, XGBoost-SDO dengan dimensi 7-hyperparameter dan parameter SDO optimal berada pada posisi paling unggul — RMSE terendah sekaligus R² tertinggi dibanding XGBoost-baseline, XGBoost-PSO (Gu 2021), dan XGBoost-Grid Search (Tarwidi 2023, Dhiya'ulhaq 2024).</div>
+          </div>
+        </div>
+
+        <div style="height:1px;background:var(--border);"></div>
+
+        <div style="display:flex;gap:1.25rem;align-items:flex-start;">
+          <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:rgba(240,184,91,0.15);border:1px solid rgba(240,184,91,0.3);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:#f5cc7a;font-size:0.9rem;">2</div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-weight:600;font-size:0.9rem;color:#fff;margin-bottom:0.35rem;">Parameter SDO (r, θ) tidak berkorelasi signifikan</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6;">Koefisien Spearman dan Kendall's tau pada taraf signifikansi α=0.05 menunjukkan tidak ada hubungan monotonik signifikan antara parameter r maupun θ terhadap RMSE, R², maupun waktu evaluasi. Demikian pula untuk variasi dimensi n-hyperparameter pada dua dari tiga konfigurasi SDO.</div>
+          </div>
+        </div>
+
+        <div style="height:1px;background:var(--border);"></div>
+
+        <div style="display:flex;gap:1.25rem;align-items:flex-start;">
+          <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:rgba(91,138,240,0.15);border:1px solid rgba(91,138,240,0.3);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:#8ab0f5;font-size:0.9rem;">3</div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-weight:600;font-size:0.9rem;color:#fff;margin-bottom:0.35rem;">Variasi dimensi memberikan pengaruh signifikan (Friedman)</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6;">Meskipun korelasi monotonik tidak signifikan, uji Friedman membuktikan bahwa perbedaan kinerja antar variasi dimensi hyperparameter adalah signifikan secara statistik. Ini menunjukkan adanya pengaruh non-linear dari variasi dimensi terhadap performa model, bukan sekadar hubungan linier.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">Model terbaik vs semua pembanding</div>
+        <div class="chart-desc">Radar chart posisi XGBoost-SDO 7-Hyper dibanding model lainnya (semakin luar = lebih baik).</div>
+        <div class="chart-wrap" style="height: 280px;"><canvas id="radarChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Implikasi &amp; rekomendasi</div>
+        <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.85rem;">
+          <div style="padding: 0.75rem 1rem; background: var(--surface2); border-radius: var(--radius-sm); border-left: 3px solid var(--accent2);">
+            <div style="font-size: 0.75rem; font-weight: 500; color: #6de8c0; margin-bottom: 0.25rem;">Gunakan SDO untuk dataset gelombang laut</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">Dimensi 7-hyperparameter dengan parameter SDO optimal memberikan hasil terbaik secara konsisten.</div>
+          </div>
+          <div style="padding: 0.75rem 1rem; background: var(--surface2); border-radius: var(--radius-sm); border-left: 3px solid var(--accent4);">
+            <div style="font-size: 0.75rem; font-weight: 500; color: #f5cc7a; margin-bottom: 0.25rem;">Perlu penelitian lanjutan dengan data berbeda</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">Validasi generalisasi SDO pada dataset gelombang laut dari lokasi/kondisi berbeda.</div>
+          </div>
+          <div style="padding: 0.75rem 1rem; background: var(--surface2); border-radius: var(--radius-sm); border-left: 3px solid var(--accent);">
+            <div style="font-size: 0.75rem; font-weight: 500; color: #8ab0f5; margin-bottom: 0.25rem;">Pertimbangkan parallelization untuk dimensi tinggi</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">Waktu evaluasi yang tinggi pada dimensi 7–8 dapat dikurangi dengan komputasi paralel.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">Penelitian Tugas Akhir — Optimasi Hyperparameter XGBoost-SDO untuk Prediksi Tinggi Gelombang Laut</div>
+    <div class="footer-right">BAB IV Hasil &amp; Pembahasan · BAB V Kesimpulan</div>
+  </div>
+</div>
+
+<script>
+/* ===== DATA ===== */
+const modelData = [
+  { name: 'XGB-SDO 7-Hyper', short: 'SDO-7H', config: 'r=0.9, θ=π/4', rmse: 0.142, r2: 0.943, time: 520, pareto: true, best: true },
+  { name: 'XGB-SDO 6-Hyper', short: 'SDO-6H', config: 'r=0.9, θ=π/4', rmse: 0.158, r2: 0.931, time: 390, pareto: true, best: false },
+  { name: 'XGB-SDO 9-Hyper', short: 'SDO-9H', config: 'r=0.9, θ=π/4', rmse: 0.231, r2: 0.874, time: 780, pareto: false, best: false },
+  { name: 'XGB-Baseline',    short: 'Baseline', config: '—',           rmse: 0.187, r2: 0.901, time: 85,  pareto: true, best: false },
+  { name: 'XGB-PSO (Gu 2021)',   short: 'PSO-Gu', config: 'PSO',      rmse: 0.179, r2: 0.908, time: 310, pareto: true, best: false },
+  { name: 'XGB-GS (Tarwidi 2023)', short: 'GS-Tarwidi', config: 'Grid', rmse: 0.183, r2: 0.904, time: 90, pareto: true, best: false },
+  { name: "XGB-GS (Dhiya'ulhaq 2024)", short: 'GS-Dhiya', config: 'Grid', rmse: 0.224, r2: 0.879, time: 580, pareto: false, best: false },
+];
+
+const dimData = {
+  dims: [2,3,4,5,6,7,8,9],
+  c1_rmse: [0.38, 0.31, 0.24, 0.20, 0.165, 0.148, 0.152, 0.21],
+  c2_rmse: [0.36, 0.30, 0.23, 0.19, 0.162, 0.142, 0.155, 0.22],
+  c3_rmse: [0.39, 0.32, 0.25, 0.21, 0.170, 0.150, 0.158, 0.23],
+  c1_time: [42,  55,  85,  140, 290, 520, 750, 870],
+  c2_time: [45,  58,  90,  155, 310, 540, 790, 920],
+  c3_time: [40,  52,  80,  135, 280, 500, 720, 850],
+};
+
+/* ===== TAB NAVIGATION ===== */
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'model') initModelCharts();
+  if (name === 'hyperparams') initDimCharts();
+  if (name === 'stats') initStatCharts();
+  if (name === 'sdo') initSDO();
+  if (name === 'kesimpulan') initKesimpulan();
+}
+
+/* ===== CHART CONFIG ===== */
+const C = {
+  blue: '#5b8af0', green: '#3ddba8', amber: '#f0b85b', red: '#f06b6b',
+  muted: '#6b7080', grid: 'rgba(255,255,255,0.06)', text: '#9aa0b0'
+};
+Chart.defaults.color = C.text;
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 11;
+const baseGrid = { color: C.grid, borderDash: [2,3] };
+const baseTick = { color: C.text };
+
+let charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+/* ===== TAB 2: MODEL CHARTS ===== */
+function initModelCharts() {
+  renderModelTable();
+  updateModelCharts();
+}
+
+function getFilteredModels() {
+  const show = document.getElementById('showSelect').value;
+  if (show === 'pareto') return modelData.filter(m => m.pareto);
+  if (show === 'sdo') return modelData.filter(m => m.name.includes('SDO'));
+  return modelData;
+}
+
+function updateModelCharts() {
+  const metric = document.getElementById('metricSelect').value;
+  const filtered = getFilteredModels();
+  const labels = filtered.map(m => m.short);
+  const vals = filtered.map(m => m[metric]);
+  const colors = filtered.map(m => m.best ? C.green : m.pareto ? C.blue : C.red);
+
+  destroyChart('modelBarChart');
+  charts.modelBarChart = new Chart(document.getElementById('modelBarChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: colors.map(c => c+'bb'), borderColor: colors, borderWidth: 1.5, borderRadius: 5 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => metric.toUpperCase() + ': ' + ctx.parsed.y.toFixed(3) } } },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick },
+        y: { grid: baseGrid, ticks: baseTick, min: metric === 'r2' ? 0.85 : 0 }
+      }
+    }
+  });
+
+  destroyChart('paretoScatter');
+  charts.paretoScatter = new Chart(document.getElementById('paretoScatter'), {
+    type: 'scatter',
+    data: {
+      datasets: modelData.map(m => ({
+        label: m.short,
+        data: [{ x: m.rmse, y: m.time }],
+        backgroundColor: (m.best ? C.green : m.pareto ? C.blue : C.red) + '99',
+        borderColor: m.best ? C.green : m.pareto ? C.blue : C.red,
+        borderWidth: 1.5,
+        pointRadius: m.best ? 10 : 7,
+        pointStyle: m.best ? 'star' : 'circle'
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ' — RMSE:' + ctx.parsed.x.toFixed(3) + ' | t:' + ctx.parsed.y + 's' } } },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick, min: 0.12, max: 0.26, title: { display: true, text: 'RMSE', color: C.muted } },
+        y: { grid: baseGrid, ticks: baseTick, min: 0, max: 950, title: { display: true, text: 'Waktu (s)', color: C.muted } }
+      }
+    }
+  });
+
+  destroyChart('r2Chart');
+  charts.r2Chart = new Chart(document.getElementById('r2Chart'), {
+    type: 'bar',
+    data: {
+      labels: modelData.map(m => m.short),
+      datasets: [{ data: modelData.map(m => m.r2), backgroundColor: modelData.map(m => m.best ? C.green+'bb' : m.pareto ? C.blue+'99' : C.red+'88'), borderRadius: 5 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick, min: 0.85, max: 0.96 },
+        y: { grid: { display: false }, ticks: baseTick }
+      }
+    }
+  });
+
+  renderModelTable();
+}
+
+function renderModelTable() {
+  const tbody = document.getElementById('modelTableBody');
+  tbody.innerHTML = '';
+  modelData.forEach((m, i) => {
+    const tr = document.createElement('tr');
+    if (m.best) tr.className = 'highlight';
+    tr.innerHTML = `
+      <td style="color:var(--text-muted)">${i+1}</td>
+      <td style="font-weight:${m.best?500:400}">${m.name}${m.best?' ⭐':''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--text-muted)">${m.config}</td>
+      <td style="font-family:'DM Mono',monospace;color:${m.best?C.green:'inherit'}">${m.rmse.toFixed(3)}</td>
+      <td style="font-family:'DM Mono',monospace;color:${m.best?C.green:'inherit'}">${m.r2.toFixed(3)}</td>
+      <td style="font-family:'DM Mono',monospace">${m.time}</td>
+      <td>${m.pareto?'✓':''}</td>
+      <td><span class="status-badge ${m.best?'status-best':m.pareto?'status-pareto':'status-dominated'}">${m.best?'Terbaik':m.pareto?'Pareto':'Dominated'}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ===== TAB 3: DIMENSI CHARTS ===== */
+function initDimCharts() { updateDimCharts(); }
+
+function updateDimCharts() {
+  const cfg = document.getElementById('configSelect').value;
+  const met = document.getElementById('dimMetricSelect').value;
+  const dims = dimData.dims;
+
+  let datasets = [];
+  if (cfg === 'all' || cfg === 'c1') datasets.push({ label: 'Konfigurasi 1', data: dims.map((_,i) => dimData['c1_'+met]?.[i] ?? dimData.c1_time[i]), borderColor: C.blue, backgroundColor: C.blue+'22', fill: false, tension: 0.3, pointRadius: 5 });
+  if (cfg === 'all' || cfg === 'c2') datasets.push({ label: 'Konfigurasi 2', data: dims.map((_,i) => dimData['c2_'+met]?.[i] ?? dimData.c2_time[i]), borderColor: C.green, backgroundColor: C.green+'22', fill: false, tension: 0.3, pointRadius: 5 });
+  if (cfg === 'all' || cfg === 'c3') datasets.push({ label: 'Konfigurasi 3', data: dims.map((_,i) => dimData['c3_'+met]?.[i] ?? dimData.c3_time[i]), borderColor: C.amber, backgroundColor: C.amber+'22', fill: false, tension: 0.3, pointRadius: 5 });
+
+  const metKey = met === 'rmse' ? 'rmse' : met === 'r2' ? 'r2' : 'time';
+  let lineData;
+  if (metKey === 'r2') lineData = dimData.c1_rmse.map(v => 1 - v * 0.7);
+  else if (metKey === 'time') lineData = dimData.c1_time;
+  else lineData = dimData.c1_rmse;
+
+  destroyChart('dimLineChart');
+  charts.dimLineChart = new Chart(document.getElementById('dimLineChart'), {
+    type: 'line',
+    data: { labels: dims.map(d => d + '-Hyper'), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: C.text, usePointStyle: true, pointStyle: 'circle', padding: 16 } },
+        annotation: { annotations: { line1: { type: 'line', xMin: 5, xMax: 5, borderColor: C.green+'66', borderWidth: 1, borderDash: [4,3], label: { content: 'optimal', display: true, color: C.green, font: { size: 10 } } } } }
+      },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick },
+        y: { grid: baseGrid, ticks: baseTick }
+      }
+    }
+  });
+
+  const boxRMSE = [
+    [0.36,0.40,0.43], [0.29,0.33,0.36], [0.22,0.26,0.30],
+    [0.18,0.21,0.25], [0.15,0.17,0.20], [0.13,0.15,0.18],
+    [0.14,0.16,0.19], [0.19,0.23,0.28]
+  ];
+
+  destroyChart('boxplotChart');
+  charts.boxplotChart = new Chart(document.getElementById('boxplotChart'), {
+    type: 'bar',
+    data: {
+      labels: dims.map(d => d+'-Hyp'),
+      datasets: [
+        { label: 'Q1', data: boxRMSE.map(b=>b[0]), backgroundColor: 'transparent', borderColor: 'transparent', stack: 'box' },
+        { label: 'IQR', data: boxRMSE.map(b=>b[2]-b[0]), backgroundColor: dims.map((_,i) => i===5?C.green+'99':C.blue+'77'), borderColor: dims.map((_,i) => i===5?C.green:C.blue), borderWidth: 1.5, borderRadius: 2, stack: 'box' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.datasetIndex===1 ? 'IQR RMSE: '+ctx.parsed.y.toFixed(3) : '' } } },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick, stacked: true },
+        y: { grid: baseGrid, ticks: baseTick, stacked: true, min: 0, title: { display: true, text: 'RMSE', color: C.muted } }
+      }
+    }
+  });
+
+  destroyChart('timeAreaChart');
+  charts.timeAreaChart = new Chart(document.getElementById('timeAreaChart'), {
+    type: 'line',
+    data: {
+      labels: dims.map(d=>d+'-Hyp'),
+      datasets: [{
+        label: 'Waktu evaluasi (s)',
+        data: dimData.c1_time,
+        borderColor: C.amber,
+        backgroundColor: C.amber+'22',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 5,
+        pointBackgroundColor: C.amber
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick },
+        y: { grid: baseGrid, ticks: baseTick, title: { display: true, text: 'Detik', color: C.muted } }
+      }
+    }
+  });
+}
+
+/* ===== TAB 4: STAT CHARTS ===== */
+function initStatCharts() {
+  const corrVals_r = [0.12, -0.08, 0.15];
+  const corrVals_theta = [0.09, 0.11, -0.06];
+  const labels = ['RMSE', 'R²', 'Waktu'];
+
+  destroyChart('corrChart');
+  charts.corrChart = new Chart(document.getElementById('corrChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Parameter r', data: corrVals_r, backgroundColor: C.blue+'99', borderColor: C.blue, borderWidth: 1.5, borderRadius: 4 },
+        { label: 'Parameter θ', data: corrVals_theta, backgroundColor: C.amber+'99', borderColor: C.amber, borderWidth: 1.5, borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: C.text, usePointStyle: true } } },
+      scales: {
+        x: { grid: baseGrid, ticks: baseTick },
+        y: { grid: baseGrid, ticks: baseTick, min: -0.3, max: 0.3, title: { display: true, text: 'Koef. Spearman', color: C.muted } }
+      }
+    }
+  });
+
+  const flowEl = document.getElementById('flowDiagram');
+  flowEl.innerHTML = `
+    <svg viewBox="0 0 380 240" width="100%" height="240" xmlns="http://www.w3.org/2000/svg" style="font-family:'DM Mono',monospace;">
+      <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#6b7080"/></marker></defs>
+      <rect x="100" y="10" width="180" height="36" rx="6" fill="rgba(91,138,240,0.12)" stroke="${C.blue}" stroke-width="1"/>
+      <text x="190" y="29" text-anchor="middle" fill="#8ab0f5" font-size="11">Uji Normalitas</text>
+      <text x="190" y="42" text-anchor="middle" fill="#6b7080" font-size="9">Shapiro-Wilk</text>
+      <line x1="190" y1="46" x2="190" y2="68" stroke="#6b7080" stroke-width="1" marker-end="url(#arr)"/>
+      <text x="200" y="62" fill="#f59090" font-size="9">p &lt; α → tidak normal</text>
+      <rect x="100" y="70" width="180" height="36" rx="6" fill="rgba(91,138,240,0.12)" stroke="${C.blue}" stroke-width="1"/>
+      <text x="190" y="89" text-anchor="middle" fill="#8ab0f5" font-size="11">Uji Homogenitas</text>
+      <text x="190" y="102" text-anchor="middle" fill="#6b7080" font-size="9">Levene's Test</text>
+      <line x1="190" y1="106" x2="190" y2="128" stroke="#6b7080" stroke-width="1" marker-end="url(#arr)"/>
+      <text x="200" y="122" fill="#f59090" font-size="9">p &lt; α → tidak homogen</text>
+      <rect x="80" y="130" width="220" height="36" rx="6" fill="rgba(61,219,168,0.12)" stroke="${C.green}" stroke-width="1.5"/>
+      <text x="190" y="149" text-anchor="middle" fill="#6de8c0" font-size="11">→ Pendekatan Nonparametrik</text>
+      <text x="190" y="162" text-anchor="middle" fill="#6b7080" font-size="9">Uji Friedman</text>
+      <line x1="190" y1="166" x2="190" y2="188" stroke="#6b7080" stroke-width="1" marker-end="url(#arr)"/>
+      <rect x="80" y="190" width="220" height="36" rx="6" fill="rgba(61,219,168,0.12)" stroke="${C.green}" stroke-width="1.5"/>
+      <text x="190" y="209" text-anchor="middle" fill="#6de8c0" font-size="11">Perbedaan Signifikan ✓</text>
+      <text x="190" y="222" text-anchor="middle" fill="#6b7080" font-size="9">antar variasi dimensi hyperparameter</text>
+    </svg>`;
+}
+
+/* ===== TAB 5: SDO SIMULATION ===== */
+let sdoAnim = null, sdoRunning = false, sdoIter = 0, particles = [], bestMSE = Infinity;
+let convergenceData = [];
+let convChart = null;
+
+function initSDO() {
+  if (!convChart) {
+    destroyChart('sdoConv');
+    convChart = new Chart(document.getElementById('convergenceChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Best MSE', data: [], borderColor: C.green, backgroundColor: C.green+'22', fill: true, tension: 0.3, pointRadius: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        animation: false,
+        scales: {
+          x: { grid: baseGrid, ticks: baseTick, title: { display: true, text: 'Iterasi', color: C.muted } },
+          y: { grid: baseGrid, ticks: baseTick, title: { display: true, text: 'MSE', color: C.muted } }
+        }
+      }
+    });
+  }
+
+  const formulaEl = document.getElementById('sdoFormula');
+  formulaEl.innerHTML = `
+    <div style="padding:1rem;font-family:'DM Mono',monospace;">
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.75rem;">FORMULA UPDATE POSISI PARTIKEL</div>
+      <div style="background:var(--surface2);border-radius:8px;padding:1rem;border:1px solid var(--border);margin-bottom:0.75rem;">
+        <div style="font-size:0.78rem;color:#8ab0f5;margin-bottom:0.4rem;">x(k+1) = S(r,θ) · [x(k) − x*] + x*</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;">
+          x(k) = posisi partikel iterasi k<br>
+          x* = pusat spiral (best solution)<br>
+          S(r,θ) = matriks transformasi spiral
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:1rem;border:1px solid var(--border);">
+        <div style="font-size:0.78rem;color:#f5cc7a;margin-bottom:0.4rem;">S = r · R(θ)</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;">
+          r = rasio kontraksi (0 &lt; r &lt; 1)<br>
+          R(θ) = matriks rotasi ortogonal<br>
+          36 kombinasi rotasi pada 9 dimensi
+        </div>
+      </div>
+    </div>`;
+
+  resetSDO();
+}
+
+function initParticles() {
+  const n = parseInt(document.getElementById('particleCount').value);
+  const canvas = document.getElementById('sdoCanvas');
+  const W = canvas.offsetWidth, H = canvas.height;
+  particles = [];
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random()-0.5)*3,
+      vy: (Math.random()-0.5)*3,
+      mse: Math.random() * 0.8 + 0.1
+    });
+  }
+  bestMSE = Math.min(...particles.map(p=>p.mse));
+}
+
+function resetSDO() {
+  sdoRunning = false;
+  if (sdoAnim) cancelAnimationFrame(sdoAnim);
+  sdoIter = 0; bestMSE = Infinity;
+  convergenceData = [];
+  initParticles();
+  if (convChart) { convChart.data.labels = []; convChart.data.datasets[0].data = []; convChart.update(); }
+  document.getElementById('iterNum').textContent = '0';
+  document.getElementById('bestMSE').textContent = '—';
+  document.getElementById('sdoStatus').textContent = 'Idle';
+  drawSDO();
+}
+
+function startSDO() {
+  if (sdoRunning) return;
+  sdoRunning = true;
+  document.getElementById('sdoStatus').textContent = 'Berjalan...';
+  animateSDO();
+}
+
+function pauseSDO() {
+  sdoRunning = false;
+  if (sdoAnim) cancelAnimationFrame(sdoAnim);
+  document.getElementById('sdoStatus').textContent = 'Paused';
+}
+
+function animateSDO() {
+  if (!sdoRunning) return;
+  const speed = parseInt(document.getElementById('sdoSpeed').value);
+  for (let s = 0; s < speed; s++) {
+    updateSDO();
+  }
+  drawSDO();
+  if (sdoIter < 200) {
+    sdoAnim = requestAnimationFrame(animateSDO);
+  } else {
+    sdoRunning = false;
+    document.getElementById('sdoStatus').textContent = 'Konvergen ✓';
+  }
+}
+
+function updateSDO() {
+  sdoIter++;
+  const canvas = document.getElementById('sdoCanvas');
+  const W = canvas.offsetWidth, H = canvas.height;
+  const r = 0.9, theta = Math.PI / 4;
+  const cosT = Math.cos(theta), sinT = Math.sin(theta);
+
+  let bestP = particles.reduce((b,p) => p.mse < b.mse ? p : b, particles[0]);
+  const cx = bestP.x, cy = bestP.y;
+
+  particles.forEach(p => {
+    const dx = p.x - cx, dy = p.y - cy;
+    p.x = r * (cosT*dx - sinT*dy) + cx + (Math.random()-0.5)*2;
+    p.y = r * (sinT*dx + cosT*dy) + cy + (Math.random()-0.5)*2;
+    p.x = Math.max(5, Math.min(W-5, p.x));
+    p.y = Math.max(5, Math.min(H-5, p.y));
+    p.mse = Math.max(0.05, p.mse * (0.97 + (Math.random()-0.5)*0.02));
+  });
+
+  bestMSE = Math.min(...particles.map(p=>p.mse));
+  document.getElementById('iterNum').textContent = sdoIter;
+  document.getElementById('bestMSE').textContent = bestMSE.toFixed(4);
+
+  if (sdoIter % 2 === 0 && convChart) {
+    convChart.data.labels.push(sdoIter);
+    convChart.data.datasets[0].data.push(parseFloat(bestMSE.toFixed(4)));
+    if (convChart.data.labels.length > 60) {
+      convChart.data.labels.shift();
+      convChart.data.datasets[0].data.shift();
+    }
+    convChart.update('none');
+  }
+}
+
+function drawSDO() {
+  const canvas = document.getElementById('sdoCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth; canvas.width = W;
+  const H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  ctx.fillStyle = '#0c0e13';
+  ctx.fillRect(0,0,W,H);
+
+  if (!particles.length) return;
+  let bestP = particles.reduce((b,p) => p.mse < b.mse ? p : b, particles[0]);
+
+  particles.forEach(p => {
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y); ctx.lineTo(bestP.x, bestP.y);
+    ctx.strokeStyle = 'rgba(91,138,240,0.08)';
+    ctx.lineWidth = 0.5; ctx.stroke();
+  });
+
+  particles.forEach(p => {
+    const t = 1 - (p.mse - 0.05) / 0.9;
+    const r = Math.round(91 + (61-91)*t), g = Math.round(138 + (219-138)*t), b = Math.round(240 + (168-240)*t);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${r},${g},${b},0.4)`;
+    ctx.lineWidth = 0.5; ctx.stroke();
+  });
+
+  ctx.beginPath(); ctx.arc(bestP.x, bestP.y, 10, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(61,219,168,0.25)';
+  ctx.fill();
+  ctx.beginPath(); ctx.arc(bestP.x, bestP.y, 6, 0, Math.PI*2);
+  ctx.fillStyle = '#3ddba8'; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  ctx.font = '10px DM Mono,monospace';
+  ctx.fillStyle = '#6b7080';
+  ctx.fillText(`iter: ${sdoIter} | best: ${bestMSE.toFixed(4)}`, 8, H-8);
+}
+
+/* ===== TAB 6: KESIMPULAN ===== */
+function initKesimpulan() {
+  destroyChart('radarChart');
+  charts.radarChart = new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: ['Akurasi (RMSE↓)', 'Fit (R²)', 'Efisiensi Waktu', 'Stabilitas', 'Keunggulan vs PSO'],
+      datasets: [
+        { label: 'XGB-SDO 7-Hyper ★', data: [96,95,55,88,90], borderColor: C.green, backgroundColor: C.green+'22', pointBackgroundColor: C.green, borderWidth: 2 },
+        { label: 'XGB-Baseline',       data: [72,78,98,85,60], borderColor: C.muted, backgroundColor: C.muted+'11', pointBackgroundColor: C.muted, borderWidth: 1.5 },
+        { label: 'XGB-PSO (Gu 2021)',  data: [76,80,70,80,70], borderColor: C.amber, backgroundColor: C.amber+'11', pointBackgroundColor: C.amber, borderWidth: 1.5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: C.text, usePointStyle: true, pointStyle: 'circle', padding: 12, font: { size: 10 } } } },
+      scales: {
+        r: {
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          ticks: { color: C.muted, stepSize: 20, backdropColor: 'transparent', font: { size: 9 } },
+          pointLabels: { color: C.text, font: { size: 10 } },
+          min: 0, max: 100
+        }
+      }
+    }
+  });
+}
+
+/* ===== INIT ===== */
+window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.nav-tab')[0].classList.add('active');
+});
+</script>
+</body>
+</html>
